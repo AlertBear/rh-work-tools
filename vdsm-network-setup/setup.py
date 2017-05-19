@@ -4,6 +4,7 @@
 import os
 import sys
 import subprocess
+import tempfile
 from sysinfo import NETWORK_SYS
 
 
@@ -29,6 +30,44 @@ def update_kv(file, kv):
         cmd = "sed -i 's/{key}=.*/{key}=\"{value}\"/' {file}".format(
             key=k, value=v, file=file)
         execute(cmd)
+
+
+def avoid_disc():
+    # Add the route to avoid the disconnection from remote server
+    # Firstly, get the default gateway
+    cmd = "ip route list|grep default"
+    output = execute(cmd)
+    s, tmpfile = tempfile.mkstemp()
+    with open(tmpfile, 'w') as f:
+        f.write(output)
+    cmd = "sed -n '/^default/p' %s" % tmpfile
+    output = execute(cmd)
+    pub_gw = output.split()[2]
+
+    # Add a route to avoid the disconnection by "ifup bridge"
+    cmd = "ip route add 10.0.0.0/8 via %s" % pub_gw
+    execute(cmd)
+    return pub_gw
+
+
+def delete_vlan_gw(vlan):
+    # Delete the vlan gateway
+    cmd = "ip route list|grep default|grep %s" % vlan
+    output = execute(cmd)
+
+    vlan_gw = output.split()[2]
+    cmd = "ip route del default via %s" % vlan_gw
+    execute(cmd)
+
+
+def restore_pub_gw(pub_gw):
+    # Add the original gateway
+    cmd = "ip route add default via %s" % pub_gw
+    execute(cmd)
+
+    # Delete the added route after the default was added
+    cmd = "ip route del 10.0.0.0/8"
+    execute(cmd)
 
 
 def setup_bond(bond_name, slave1, slave2):
@@ -92,6 +131,14 @@ def setup_bond(bond_name, slave1, slave2):
     cmd = "mv %sifcfg-* %s" % (tmp_tpl_dir, network_scripts_dir)
     execute(cmd)
 
+    # Restart the service
+    cmd = "service network restart"
+    execute(cmd)
+
+    # Show all the ip
+    cmd = "ip a s"
+    print execute(cmd)
+
 
 def setup_vlan(vlan_device, vlan_id):
     # Find the ifcfg files templates
@@ -134,10 +181,28 @@ def setup_vlan(vlan_device, vlan_id):
     network_scripts_dir = "/etc/sysconfig/network-scripts/"
     if os.path.isfile(network_scripts_dir + "ifcfg-%s" % vlan_device):
         os.rename(
-            network_scripts_dir + "ifcfg-%s" % slave1,
-            network_scripts_dir + "ifcfg-%s.bak" % slave1)
+            network_scripts_dir + "ifcfg-%s" % vlan_device,
+            network_scripts_dir + "ifcfg-%s.bak" % vlan_device)
     cmd = "mv %sifcfg-* %s" % (tmp_tpl_dir, network_scripts_dir)
     execute(cmd)
+
+    # Add a gateway to avoid the disconnection by following step
+    pub_gateway = avoid_disc()
+
+    # Bring up the vlan ip, may create the internal default gateway
+    vlan = vlan_device + '.' + vlan_id
+    cmd = "ifup %s" % vlan
+    execute(cmd)
+
+    # Delete the internal vlan gateway such as "192.168.xx.1"
+    delete_vlan_gw(vlan)
+
+    # Restore the pub gateway
+    restore_pub_gw(pub_gateway)
+
+    # Show all the ip
+    cmd = "ip a s"
+    print execute(cmd)
 
 
 def setup_bv(bond_name, slave1, slave2, vlan_id):
@@ -205,6 +270,24 @@ def setup_bv(bond_name, slave1, slave2, vlan_id):
             network_scripts_dir + "ifcfg-%s.bak" % slave2)
     cmd = "mv %sifcfg-* %s" % (tmp_tpl_dir, network_scripts_dir)
     execute(cmd)
+
+    # Add a gateway to avoid the disconnection by following step
+    pub_gateway = avoid_disc()
+
+    # Bring up the vlan ip, may create the internal default gateway
+    bv = bond_name + '.' + vlan_id
+    cmd = "ifup %s" % bv
+    execute(cmd)
+
+    # Delete the internal vlan gateway such as "192.168.xx.1"
+    delete_vlan_gw(bv)
+
+    # Restore the pub gateway
+    restore_pub_gw(pub_gateway)
+
+    # Show all the ip
+    cmd = "ip a s"
+    print execute(cmd)
 
 
 if __name__ == "__main__":
