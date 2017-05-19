@@ -202,15 +202,27 @@ def setup_bv(bond_name, slave1, slave2, vlan_id):
 
 
 if __name__ == "__main__":
-    machine_used = sys.argv[1]
-    network_mode = sys.argv[2]
-    if machine_used not in NETWORK_SYS.keys():
-        print "ERROR: Machine not in record, \
-            please see the detail of sysinfo.py"
+    if len(sys.argv) < 2:
+        print "ERROR: Append correct parameter, such as \"python %s bond\"" % sys.argv[0]
         sys.exit(1)
 
+    network_mode = sys.argv[1]
     if network_mode not in ["bond", "vlan", "bv"]:
-        print "ERROR: Please fill [bond, vlan, bv] as the second argumet"
+        print "ERROR: Please fill [bond, vlan, bv] as the second parameter"
+        sys.exit(1)
+
+    if len(sys.argv) < 3:
+        cmd = "hostname"
+        output = execute(cmd)
+        machine_used = output
+    elif len(sys.argv) == 3:
+        machine_used = sys.argv[2]
+
+    if machine_used not in NETWORK_SYS.keys():
+        print "ERROR: Hostname [%s] not in record, \
+            please see the detail of sysinfo.py \
+            and specify the machine as the second\
+            parameter follow this script" % machine_used
         sys.exit(1)
 
     if network_mode == "bond":
