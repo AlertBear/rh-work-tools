@@ -1,0 +1,13 @@
+#!/bin/sh
+
+#
+# Purpose:
+# Used to remove the existing ECDSA key for ssh connection
+#
+
+# Get the host to prompt
+out=$(awk 'NR=='$1' {print $1}' "/home/dguo/.ssh/known_hosts")
+echo "Removing ECDSA key of $out from /home/dguo/.ssh/known_host file"  
+
+# Remove the ECDSA key from known_hosts file
+sed -i '$1d' "/home/dguo/.ssh/known_hosts"
