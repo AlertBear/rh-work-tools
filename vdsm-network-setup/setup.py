@@ -245,18 +245,18 @@ def setup_bv(bond_name, slave1, slave2, vlan_id):
 
     # Update the templates
     bond_cfg_kv = {"DEVICE": bond_name}
-    update_kv(bond_cfg_file, bond_cfg_kv)
+    update_kv(dbond_cfg_file, bond_cfg_kv)
 
     slave1_cfg_kv = {
         "DEVICE": slave1, "HWADDR": slave1_mac, "MASTER": bond_name}
-    update_kv(slave1_cfg_file, slave1_cfg_kv)
+    update_kv(dslave1_cfg_file, slave1_cfg_kv)
 
     slave2_cfg_kv = {
         "DEVICE": slave2, "HWADDR": slave2_mac, "MASTER": bond_name}
-    update_kv(slave2_cfg_file, slave2_cfg_kv)
+    update_kv(dslave2_cfg_file, slave2_cfg_kv)
 
-    vlan_cfg_kv = {"DEVICE": vlan_device + ".%s" % vlan_id}
-    update_kv(vlan_cfg_file, vlan_cfg_kv)
+    vlan_cfg_kv = {"DEVICE": bond_name + ".%s" % vlan_id}
+    update_kv(dvlan_cfg_file, vlan_cfg_kv)
 
     # Move the files to /etc/sysconfig/network-scripts
     network_scripts_dir = "/etc/sysconfig/network-scripts/"
@@ -274,12 +274,12 @@ def setup_bv(bond_name, slave1, slave2, vlan_id):
     # Add a gateway to avoid the disconnection by following step
     pub_gateway = avoid_disc()
 
-    # Bring up the vlan ip, may create the internal default gateway
-    bv = bond_name + '.' + vlan_id
-    cmd = "ifup %s" % bv
+    # Restart the service, may create the internal default gateway
+    cmd = "service network restart"
     execute(cmd)
 
     # Delete the internal vlan gateway such as "192.168.xx.1"
+    bv = bond_name + '.' + vlan_id
     delete_vlan_gw(bv)
 
     # Restore the pub gateway
